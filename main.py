@@ -32,23 +32,27 @@ try:
         p_keys = f.read().splitlines()
 
     data = []
-    for seed in p_keys:
-        if len(str(seed))<70:
-            if seed[:2]!='0x':
-                seed='0x'+seed
-            acc = web3.eth.account.from_key(seed)
-            data.append((Web3.to_checksum_address(acc.address), seed))
-        else:
 
-            pk, address = get_private_from_seed(seed)
-            data.append((Web3.to_checksum_address(address), pk))
+    for index, seed in enumerate(p_keys, start=1):
+        try:
+            if len(str(seed))<70:
+                if seed[:2]!='0x':
+                    seed='0x'+seed
+                acc = web3.eth.account.from_key(seed)
+                data.append((index, Web3.to_checksum_address(acc.address), seed))
+            else:
+
+                pk, address = get_private_from_seed(seed)
+                data.append((index, Web3.to_checksum_address(address), pk))
+        except Exception as e:
+            data.append((index, 'Error', {e}))
 
     results_dir='results'
     output_file = get_unique_filename(results_dir, 'addresses.csv')
 
     with open(output_file, 'a+', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["Address", "Private Key"])
+        writer.writerow(['No', "Address", "Private Key"])
         writer.writerows(data)
 
     print(f'Converted {len(p_keys)} private keys/seeds. Results saved in {output_file}')
