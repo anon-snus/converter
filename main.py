@@ -34,6 +34,8 @@ try:
     data = []
     for seed in p_keys:
         if len(str(seed))<70:
+            if seed[:2]!='0x':
+                seed='0x'+seed
             acc = web3.eth.account.from_key(seed)
             data.append((Web3.to_checksum_address(acc.address), seed))
         else:
