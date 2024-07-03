@@ -7,7 +7,7 @@ from tqdm.asyncio import tqdm
 
 from exceptions import InvalidProxy
 
-format='login:password@ip:port' # указать порядок элементов айпи в вашем софте через двоеточие названия элементов : ip:port:login:password
+format='login:password:ip:port' # указать порядок элементов айпи в вашем софте через двоеточие названия элементов : ip:port:login:password
 async def check_format(proxy: str):
     if format!= 'login:password@ip:port':
         format_parts = format.split(':')
