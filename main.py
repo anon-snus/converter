@@ -1,35 +1,16 @@
-import asyncio
-import aiohttp
-import csv
-import re
 import os
-from tqdm.asyncio import tqdm
+from web3 import Web3
+import csv
 
-from exceptions import InvalidProxy
+def get_private_from_seed(seed: str) -> tuple:
+    web3 = Web3()
+    web3.eth.account.enable_unaudited_hdwallet_features()
 
-format='login:password:ip:port' # указать порядок элементов айпи в вашем софте через двоеточие названия элементов : ip:port:login:password
-async def check_format(proxy: str):
-    if format!= 'login:password@ip:port':
-        format_parts = format.split(':')
-        proxy_parts = re.split('[:@]', proxy)
-        proxy_dict = {key: value for key, value in zip(format_parts, proxy_parts)}
-        proxy = f"{proxy_dict['login']}:{proxy_dict['password']}@{proxy_dict['ip']}:{proxy_dict['port']}"
-    if 'http' not in proxy:
-        proxy = f'http://{proxy}'
-    return proxy
+    web3_account = web3.eth.account.from_mnemonic(seed)
 
-
-async def check_ip(proxy: str):
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get('http://eth0.me/', proxy=proxy) as r:
-                your_ip = (await r.text()).strip()
-                if your_ip not in proxy:
-                    raise InvalidProxy(f"Proxy {proxy} doesn't work! Your IP is {your_ip}.")
-                else:
-                    return f'Proxy {proxy} is good'
-        except Exception as e:
-            raise InvalidProxy(f"Proxy {proxy} doesn't work! Error: {e}")
+    private_key = web3_account._private_key.hex()
+    address = web3_account.address
+    return private_key, address
 
 def get_unique_filename(directory: str, base_filename: str) -> str:
     if not os.path.exists(directory):
@@ -43,39 +24,38 @@ def get_unique_filename(directory: str, base_filename: str) -> str:
         counter += 1
     return new_filename
 
-async def main():
-    proxies = []
-    # Read proxies from file
-    try:
-        with open('proxies.txt', 'r') as file:
-            proxies = [line.strip() for line in file if line.strip()]
-    except FileNotFoundError:
-        print("Proxies file not found!")
-        return
 
-    results = []
-    tasks = []
-    for i, proxy in enumerate(proxies, start=1):
-        formatted_proxy = await check_format(proxy)
-        tasks.append((i, proxy, check_ip(formatted_proxy)))
+try:
+    web3 = Web3()
 
-    # Execute tasks concurrently with a progress bar
-    for i, (idx, proxy, task) in tqdm(enumerate(tasks, start=1), total=len(tasks)):
+    with open('privatekeys-seed.txt') as f:
+        p_keys = f.read().splitlines()
+
+    data = []
+
+    for index, seed in enumerate(p_keys, start=1):
         try:
-            await task
-            results.append([idx, proxy, 'Works'])
+            if len(str(seed))<70:
+                if seed[:2]!='0x':
+                    seed='0x'+seed
+                acc = web3.eth.account.from_key(seed)
+                data.append((index, Web3.to_checksum_address(acc.address), seed))
+            else:
+
+                pk, address = get_private_from_seed(seed)
+                data.append((index, Web3.to_checksum_address(address), pk))
         except Exception as e:
-            results.append([idx, proxy, 'Does not work'])
+            data.append((index, 'Error', {e}))
 
-    results_dir = 'results'
-    output_file = get_unique_filename(results_dir, 'proxy_results.csv')
+    results_dir='results'
+    output_file = get_unique_filename(results_dir, 'addresses.csv')
 
-    # Write results to CSV file
-    with open(output_file, 'w', newline='') as csvfile:
-        fieldnames = ['No', 'Proxy', 'Status']
-        writer = csv.writer(csvfile)
-        writer.writerow(fieldnames)
-        writer.writerows(results)
+    with open(output_file, 'a+', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['No', "Address", "Private Key"])
+        writer.writerows(data)
 
-if __name__ == '__main__':
-    asyncio.run(main())
+    print(f'Converted {len(p_keys)} private keys/seeds. Results saved in {output_file}')
+except Exception as err:
+    print(f'ERROR: {err}')
+
